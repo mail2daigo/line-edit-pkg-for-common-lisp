@@ -1,5 +1,5 @@
 ;;;
-;;; last updated : 2026-06-09 17:09:28(JST)
+;;; last updated : 2026-06-20 16:43:37(JST)
 ;;;
 ;;; line-edit-pkg : Read line with customizable editor command, like Emacs, vi and WordMaster.
 ;;;     Licenced under GNU Library General Public Licence.
@@ -26,6 +26,7 @@
 ;;; 入力できる文字数は無制限。文字入力用ウインドウ幅を超えて文字を入力すると自動的に文字が左スクロールする。
 ;;; 特殊文字の文字コード定義は7 bit範囲なので、ASCII、UTF-8、SHIFT-JISで共通。UTF-16、EBCDICは未対応。
 ;;;
+;;; 2026-06-20 [package-util.lisp]にパッケージの依存(ユース)関係をGraphvizで表示する関数[view-dot-graph]を追加。
 ;;; 2026-06-09 [package-util.lisp]内のpushdとpopdのバグを修正。
 ;;; 2026-06-07 [package-util.lisp]に用意されたパッケージ移動関数以外の方法で移動した場合の捕捉方法を修正。
 ;;; 2026-06-06 関数[history-repl]にrepl初期状態のパッケージを指定するオプショナル引数を追加した。
@@ -478,7 +479,7 @@
 (declaim (ftype (function (&optional t t) t) true-getsym))
 (declaim (ftype (function (&optional t t) t) getsym))
 
-(defconstant +line-edit-version+ "line-edit-pkg: Version 2026-06-09 17:08:57")
+(defconstant +line-edit-version+ "line-edit-pkg: Version 2026-06-20 16:41:02")
 
 (defconstant +small-a+                  "small-a")
 (defconstant +small-b+                  "small-b")
@@ -753,6 +754,7 @@
 (defparameter *sleep-for-wait* 1/10000)                 ;; 待機なし先読みでの入力文字存在問い合わせ待ち時間。
 (defparameter *long-sleep-for-wait* 1/50)               ;; listenでの問い合わせ待ち時間。
 
+#|
 (defparameter *package-exclusion-list*                  ;; パッケージ名補完の対象外とするパッケージ。
   #+sbcl
   '(
@@ -886,6 +888,7 @@
     "system"
     "wildcard")
   )
+|#
 
 ;;;
 ;;; システムとしての各種初期値。
@@ -7736,7 +7739,7 @@ Super + Meta + Control + [key]などの3重修飾キーの定義も可能。Supe
         )
 
       (dolist (p pkg-lst)
-        (when (not (member p *package-exclusion-list* :test #'string-equal))
+        (when (not (member p (package-exclusion-list) :test #'string-equal))
           (setf nickname-list (package-name-case-list-convert (package-nicknames p)))
           (cond
             ((null nickname-list) ;; ニックネームが存在しないときはパッケージ名→(find-package パッケージ名)。

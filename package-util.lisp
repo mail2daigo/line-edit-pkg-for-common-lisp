@@ -3,6 +3,8 @@
 ;;;
 ;;; last updated : 2026-04-11 10:26:00(JST)
 ;;;
+;;; 2026-06-20 パッケージ間の依存(ユース)関係をGraphvizで表示する関数[view-package-dependency-graph]を実装。
+;;;
 
 #+ :build-as-packages
 (defpackage :package-util
@@ -32,6 +34,7 @@
    #:package-name-case-convert
    #:package-name-case-list-convert
    #:packages-exception-list
+   #:package-exclusion-list
    #:shortest-nickname
    #:get-external-symbols
    #:get-internal-symbols
@@ -39,6 +42,8 @@
    #:symbol-attribute
    #:type-of-symbol
    #:last-package
+   #:view-package-dependency-graph ;; パッケージ間の依存(ユース)関係をGraphvizで表示する。
+   #:view-pkg-dep
    )
   )
 
@@ -47,6 +52,10 @@
 
 #+ :build-as-packages (in-package :package-util)
 
+(defconstant +graphviz-shape+ '(:box :oval :ellipse :egg :triangle :diamond :trapezoid :hexgon :octagon))
+(defconstant +graphviz-packmode+ '(:node :column :cluster))
+
+(defparameter *package-dependency-graph-fname-prefix* "package-dependency-graph-")
 (defparameter *package-stack* nil)
 (defparameter *last-package* nil)   ;; 現在のパッケージを記録しておく。
 ;;(defparameter *last-package* (find-package :cl-user))
@@ -55,6 +64,143 @@
 (defparameter *package-changed* nil)
 (defparameter *packages-exception-list*
   '("common-lisp" "keyword" "system")) ;; 外部シンボルを取得しないパッケージ。
+(defparameter *package-exclusion-list* ;; パッケージ名補完の対象外とするパッケージ。
+  #+sbcl
+  '(
+    "asdf/action"
+    "asdf/backward-interface"
+    "asdf/backward-internals"
+    "asdf/bundle"
+    "asdf/component"
+    "asdf/concatenate-source"
+    "asdf/find-component"
+    "asdf/find-system"
+    "asdf/footer"
+    "asdf/forcing"
+    "asdf/interface"
+    "asdf/lisp-action"
+    "asdf/operate"
+    "asdf/operation"
+    "asdf/output-translations"
+    "asdf/package-inferred-system"
+    "asdf/parse-defsystem"
+    "asdf/plan"
+    "asdf/session"
+    "asdf/source-registry"
+    "asdf/system"
+    "asdf/system-registry"
+    "asdf/upgrade"
+    "asdf/user"
+    ;; "common-lisp"
+    ;; "common-lisp-user"
+    ;; "keyword"
+    "ql-abcl"
+    "ql-allegro"
+    "ql-bundle"
+    "ql-ccl"
+    "ql-cdb"
+    "ql-clasp"
+    "ql-clisp"
+    "ql-cmucl"
+    "ql-config"
+    "ql-dist"
+    "ql-dist-user"
+    "ql-ecl"
+    "ql-gunzipper"
+    "ql-http"
+    "ql-impl"
+    "ql-impl-util"
+    "ql-info"
+    "ql-lispworks"
+    "ql-mezzano"
+    "ql-minitar"
+    "ql-mkcl"
+    "ql-network"
+    "ql-progress"
+    "ql-sbcl"
+    "ql-scl"
+    "ql-setup"
+    "ql-util"
+    "quicklisp-client"
+    "sb-alien"
+    "sb-alien-internals"
+    "sb-aprof"
+    "sb-assem"
+    "sb-bignum"
+    "sb-brothertree"
+    "sb-bsd-sockets"
+    "sb-bsd-sockets-internal"
+    "sb-c"
+    "sb-debug"
+    "sb-di"
+    "sb-disassem"
+    "sb-eval"
+    "sb-ext"
+    "sb-fasl"
+    "sb-format"
+    "sb-gray"
+    "sb-impl"
+    "sb-int"
+    "sb-kernel"
+    "sb-lockless"
+    "sb-loop"
+    "sb-mop"
+    "sb-pcl"
+    "sb-posix"
+    "sb-pretty"
+    "sb-profile"
+    "sb-regalloc"
+    "sb-sequence"
+    "sb-sys"
+    "sb-thread"
+    "sb-unicode"
+    "sb-unix"
+    "sb-vm"
+    "sb-walker"
+    "sb-x86-64-asm"
+    "uiop/backward-driver" 
+    "uiop/common-lisp"
+    "uiop/configuration" 
+    "uiop/driver" 
+    "uiop/filesystem" 
+    "uiop/image"
+    "uiop/launch-program" 
+    "uiop/lisp-build" 
+    "uiop/os" 
+    "uiop/package"
+    "uiop/pathname" 
+    "uiop/run-program" 
+    "uiop/stream" 
+    "uiop/utility" 
+    "uiop/version")
+  #+ clisp
+  '(
+    "charset"
+    "clos"
+    ;;"common-lisp"
+    ;;"common-lisp-user"
+    ;; "keyword"
+    "cs-common-lisp"
+    "cs-common-lisp-user"
+    "custom"
+    "exporting"
+    "ext"
+    "ffi"
+    "gray"
+    "gstream"
+    "i18n"
+    "posix"
+    "readline"
+    "regexp"
+    "screen"
+    "socket"
+    "system"
+    "wildcard")
+  )
+
+(defun package-exclusion-list ()
+  *package-exclusion-list*
+  )
 
 (defun packages-exception-list ()
   *packages-exception-list*
@@ -758,5 +904,197 @@
       ) ;; end let
     )   ;; end get-external&internal&inherited-symbol-list
   ) ;; end let
+
+;;
+;; <package-dependency-data> ::= (<package-data>*) ;
+;; <package-data> ::= (<package-name> {nil | (<package-nickname-list>)} {nil | (<package-use-list>)}) ;
+;;
+(defun package-dependency-list ()
+  (let (pkg-nickname-list (result nil) exception-list)
+    (set-package-name-case :downcase) ;; パッケージ名文字列を小文字化する。
+    (setf exception-list (union
+			  (union (package-exclusion-list) (packages-exception-list))
+			  (list "common-lisp-user"))
+	  )
+    (dolist (pkg (list-all-packages))
+      (when (not (member (package-name pkg) exception-list :test #'string-equal))
+	;;(format t "pkg=~s~%" pkg)
+	(setf pkg-nickname-list (package-name-case-list-convert (sort-nicknames pkg)))
+	;;(format t "pkg-nickname-list=~s~%" pkg-nickname-list)
+	(if (null pkg-nickname-list)
+	    (push (list (package-name-case-convert (package-name pkg))
+			nil
+			(package-string-use-list pkg)
+			)
+		  result)
+	    (push (list (package-name-case-convert (package-name pkg))
+			pkg-nickname-list
+			(package-string-use-list pkg)
+			)
+		  result)
+	    ) ;; end if
+	) ;; end dolist
+      )	  ;; end when
+    ;;(format t "result=~s~%" result)
+    (return-from package-dependency-list result)
+    ) ;; end let
+  ) ;; end package-dependency-list
+
+;; パッケージ依存データからGraphviz(DOT)形式のデータを出力する。
+;;  > dot -Tpng 'fname' -o filename.png
+;;  > eog filename.png
+;; で表示できる。
+(defun generate-package-dependency-dot-data (pkg-dep-list fname &key (shape :box) (packmode :node))
+  (let (node-shape graph-packmode)
+
+    (if (member shape +graphviz-shape+ :test #'equal)
+	(setf node-shape (string-downcase (string shape)))
+	(progn
+	  (warn "generate-package-dependency-dot-data: :shape must be ~s." +graphviz-shape+)
+	  (format t "Set shape to \`\:box\`.~%")
+	  (setf node-shape "box")
+	  )
+	)
+
+    (if (member packmode +graphviz-packmode+ :test #'equal)
+	(setf graph-packmode (string-downcase (string packmode)))
+	(progn
+	  (warn "generate-package-dependency-dot-data: :packmode must be ~s." +graphviz-packmode+)
+	  (format t "Set packmode to \`\:node\`.~%")
+	  (setf graph-packmode "node")
+	  )
+	)
+
+    (with-open-file (stream fname :direction :output :if-does-not-exist :create :if-exists :supersede)
+      (format stream "digraph G {~%")
+      (format stream "  pack = true;~%") ;; グラフ全体を密にパック。
+      (format stream (format nil "  packmode = ~s;\~\%" graph-packmode))
+      (format stream (format nil "  node [shape = ~a];\~\%" node-shape))
+      (dolist (lst pkg-dep-list)
+	;;(format t "lst=~s~%" lst)
+	(cond
+	  ((null (second lst)) ;; ニックネーム文字列のリストが空か？
+	   (format stream "  \"~a\" -> \"~a\";~%"
+		   (third lst) ;; ユースしているパッケージ名文字列のリスト。
+		   (first lst) ;; パッケージ名文字列。
+		   )
+	   )
+	  (t
+	   (format stream "  \"~a\" -> \"~a (~{~a~^,~})\";~%"
+		   (third lst) ;; ユースしているパッケージ名文字列のリスト。
+		   (first lst) ;; パッケージ名文字列。
+		   (second lst) ;; ニックネーム文字列のリスト。
+		   )
+	   )
+	  ) ;; end cond
+	)   ;; end dolist
+      (format stream "}~%")
+      ) ;; end with-open-file
+    (return-from generate-package-dependency-dot-data fname)
+    ) ;; end let
+  ) ;; end generatte-package-dependency-dot-data
+
+(defun date-string ()
+  (let (tmp)
+    (setf tmp (multiple-value-list (get-decoded-time)))
+    (format nil "~4d~2,'0d~2,'0d" (sixth tmp) (fifth tmp) (fourth tmp))
+    )
+  )
+
+(defun time-string ()
+  (let (tmp)
+    (setf tmp (multiple-value-list (get-decoded-time)))
+    (format nil "~2,'0d~2,'0d~2,'0d" (third tmp) (second tmp) (truncate (first tmp)))
+    )
+  )
+
+(defun viewer-command ()
+  #+(or linux unix) "eog"
+  #+darwin "open -W -a Preview"
+  #+windows "mspaint" ;; または "powershell -command ..." 等
+  )
+
+;;
+;; 除外パッケージ以外のユース情報を作成して描画する。
+;;
+(defun view-package-dependency-graph
+    (&key (delete-working-files nil) (verbose t) (shape :box) (packmode :node))
+  (let (fname (exist-dot-command-p nil) (exist-viewer-command-p nil) png-file-name dot-file-name)
+
+    (setf exist-dot-command-p (absolute-path "dot" :exec-p t)) ;; dotコマンドが存在して実行可能か？
+    (setf exist-viewer-command-p (absolute-path (viewer-command) :exec-p t)) ;; ビューワ・コマンドは？
+
+    (when (not (and exist-dot-command-p exist-viewer-command-p))
+      (when (not exist-dot-command-p)
+	(warn "Please install Graphviz.~%")
+	(format t "Bash~%")
+	#+linux (format t "~1,8tsudo apt update~%")
+	#+linux (format t "~1,8tsudo apt install graphviz~%")
+	) ;; end inner when
+      (when (not exist-viewer-command-p)
+	(warn "Please install ~a.~%" (viewer-command))
+	(format t "Bash~%")
+	#+linux (format t "~1,8tsudo apt update~%")
+	#+linux (format t "~1,8tsudo apt install ~a~%" (viewer-command))
+	)
+      (return-from view-package-dependency-graph nil)
+      )
+
+    (setf fname (format nil "~a~aT~a"
+			*package-dependency-graph-fname-prefix*
+			;;(iso-date-string)
+			;;(iso-time-string) ;; 文字列中に[":"]が含まれているとxdg-openは誤動作する。
+			(date-string)
+			(time-string)
+			)
+	  )
+    (setf dot-file-name (concatenate 'string fname ".dot"))
+    (setf png-file-name (concatenate 'string fname ".png"))
+
+    (when (debug-print-p "view-package-dependency-graph")
+      (format t "fname=~s~%" fname)
+      (format t "dot-file-name=~s~%" dot-file-name)
+      (format t "png-file-name=~s~%" png-file-name)
+      )
+
+    (generate-package-dependency-dot-data
+     (package-dependency-list)
+     dot-file-name
+     :shape shape
+     :packmode packmode)
+
+    (exec-command "dot" "-Tpng" dot-file-name "-o" png-file-name)
+    (when verbose
+      (format t "\;\; dot -Tpng ~a -o ~a~%" dot-file-name png-file-name)
+      (format t "\;\; ~a ~a~%" (viewer-command) png-file-name)
+      ) ;; end when
+
+    (if delete-working-files
+        ;; 削除フラグが t の場合：
+        (let ((shell-cmd (format nil "~a ~a 2>/dev/null && rm ~a ~a"
+                                 (viewer-command) png-file-name dot-file-name png-file-name)))
+          (exec-command "sh" "-c" (format nil "~a &" shell-cmd)))
+        
+        ;; 削除フラグが nil の場合：
+        (exec-command "sh" "-c" (format nil "~a ~a 2>/dev/null &" (viewer-command) png-file-name)))
+
+    ;; if文の外側で verbose フラグをチェックする
+    (when (and delete-working-files verbose)
+      (format t "dot file [~a]~% and~%png file [~a]~% will be deleted after closing the viewer.~%" 
+              dot-file-name png-file-name)
+      (finish-output)
+      ) ;; end when
+    (values)
+    ) ;; end let
+  ) ;; end view-package-dependency-graph
+
+(defun view-pkg-dep (&key (delete-working-files t) (verbose t) (shape :box) (packmode :node))
+  (view-package-dependency-graph
+   :delete-working-files delete-working-files
+   :verbose verbose
+   :shape shape
+   :packmode packmode
+   )
+  )
 
 #+ :build-as-packages (provide :package-util)

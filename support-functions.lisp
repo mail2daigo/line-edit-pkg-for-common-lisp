@@ -1,5 +1,5 @@
 ;;;
-;;; last updated : 2026-06-07 10:49:35(JST)
+;;; last updated : 2026-06-21 10:38:05(JST)
 ;;;
 ;;; 機種依存関数とサポート用関数の定義
 ;;;
@@ -562,13 +562,17 @@ nil
     (declare (type string command))
     (setf cmd (absolute-path command :exec-p t))
     (when (null cmd) ;; 存在し実行可能か？
-      ;;(format t "実行可能なコマンド(~a)は存在しませんでした。~%" command)
       (message :support-functions+exec-command-001 "実行可能なコマンド(~a)は存在しませんでした。~%" command)
       (return-from exec-command nil)
       )
-    #+ clisp (ext:run-program cmd :arguments params :wait t)
-    #+ sbcl  (sb-ext:run-program cmd params :input t :output t :error t :wait t) 
-    #+ gcl   (system (concatenate 'string cmd (string-list-to-string params)))
+    ;;#+ clisp (ext:run-program cmd :arguments params :wait t)
+    #+ clisp (if (string= command "sh")
+                 ;; sh -c が呼ばれた場合は、引数をそのまま渡す
+                 (ext:run-program "sh" :arguments params :wait t)
+                 ;; それ以外の通常のコマンド呼び出し（dotなど）の場合
+                 (ext:run-program cmd :arguments params :wait t))
+    #+ sbcl  (sb-ext:run-program cmd params :input t :output t :error nil :wait t) 
+    #+ gcl   (system (concatenate 'string cmd " " (string-list-to-string params)))
     )
   )
 
@@ -897,6 +901,7 @@ nil
     )   ;; end let
   )
 
+#|
 (defun less (&rest fname)
   (format t "(less ~s)~%" fname)
   #+ gcl (system (concatenate 'string "less" (string-list-to-string fname)))
@@ -904,6 +909,12 @@ nil
   #+ clisp
   (ext:run-program (absolute-path "less") :arguments fname :input :terminal :output :terminal :wait t)
   #+ sbcl (sb-ext:run-program (absolute-path "less") fname :input t :output t :error t :wait t) 
+  )
+|#
+
+(defun less (fname)
+  (format t "(less ~s)~%" fname)
+  (exec-command "less" fname)
   )
 
 (defun string-list-to-string (lst)

@@ -1,5 +1,5 @@
 ;;;
-;;; last updated : 2026-06-09 17:59:04(JST)
+;;; last updated : 2026-06-21 10:08:33(JST)
 ;;;
 
 #+ :build-as-packages
@@ -27,18 +27,20 @@
 (defparameter *current-default-prompt-color* 'blue)     ;; repl毎のプロンプト全体の既定色。
 (defparameter *shadowing-import-functions* ;; パッケージ前置子なしで呼び出したい関数を登録しておく。
   '(
-    package-util:cd             ;; change package-directory stack.
-    package-util:pwd            ;; print working package-directory.
-    package-util:pushd          ;; push package to package-directory.
-    package-util:popd           ;; pop package from package-directory.
-    package-util:dirs           ;; show package-directory stack.
-    package-util:rotate-up-dir  ;; rotate up package-directory stack.
-    package-util:rotud          ;; synonym of rotate-up-dir
-    package-util:rotd           ;; synonym of rotate-up-dir
-    package-util:rotate-down-dir;; rotate down package-directory stack.
-    package-util:rotdd          ;; synonym of rotate-down-dir
-    package-util:exchgd         ;; exchange directory top and sencond.
-    package-util:ls             ;; list symbols.
+    package-util:cd              ;; change package-directory stack.
+    package-util:pwd             ;; print working package-directory.
+    package-util:pushd           ;; push package to package-directory.
+    package-util:popd            ;; pop package from package-directory.
+    package-util:dirs            ;; show package-directory stack.
+    package-util:rotate-up-dir   ;; rotate up package-directory stack.
+    package-util:rotud           ;; synonym of rotate-up-dir
+    package-util:rotd            ;; synonym of rotate-up-dir
+    package-util:rotate-down-dir ;; rotate down package-directory stack.
+    package-util:rotdd           ;; synonym of rotate-down-dir
+    package-util:exchgd          ;; exchange directory top and sencond.
+    package-util:ls              ;; list symbols.
+    package-util:view-package-dependency-graph ;; パッケージ間の依存(ユース)関係をgraphvizで描画する。
+    package-util:view-pkg-dep    ;; [view-package-dependency-graph]のラッパー関数。
     debug-print:debug-print
     debug-print:debug-print-p
     line-edit-pkg:select-language
