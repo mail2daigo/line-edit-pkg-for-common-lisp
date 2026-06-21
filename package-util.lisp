@@ -1088,6 +1088,16 @@
     ) ;; end let
   ) ;; end view-package-dependency-graph
 
+;;
+;; 除外指定以外のパッケージ間のユース関係をGraphvizで描画する関数。
+;;	:delete-working-files	生成されるdotファイルとpngファイルを描画終了後に削除する。
+;;				ファイル名は実行時の日付と時刻を元に自動的に生成する。
+;;	:verbose		実行するdotコマンドとビューワ・コマンドをコメントとして表示する。
+;;	:shape			Graphvizが描画するノードの形状を指定する。
+;;				  :box :oval :ellipse :egg :triangle :diamond :trapezoid :hexgon :octagon
+;;	:packmode		Graphvizの描画モードを指定する。
+;;				  :node :column :cluster
+;;
 (defun view-pkg-dep (&key (delete-working-files t) (verbose t) (shape :box) (packmode :node))
   (view-package-dependency-graph
    :delete-working-files delete-working-files
