@@ -1,0 +1,18 @@
+digraph G {
+  pack = true;
+  packmode = "node";
+  node [shape = box];
+  "support-functions (debug-print,external-command)" -> "history-repl";
+  "print-color-string" -> "history-repl";
+  "package-util (px,dir)" -> "history-repl";
+  "line-edit-pkg (cl-rl,cl-readline)" -> "history-repl";
+  "history-pkg" -> "history-repl";
+  "support-functions (debug-print,external-command)" -> "line-edit-pkg (cl-rl,cl-readline)";
+  "package-util (px,dir)" -> "line-edit-pkg (cl-rl,cl-readline)";
+  "history-pkg" -> "line-edit-pkg (cl-rl,cl-readline)";
+  "support-functions (debug-print,external-command)" -> "history-pkg";
+  "print-color-string" -> "history-pkg";
+  "package-util (px,dir)" -> "history-pkg";
+  "support-functions (debug-print,external-command)" -> "print-color-string";
+  "support-functions (debug-print,external-command)" -> "package-util (px,dir)";
+}

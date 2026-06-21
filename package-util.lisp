@@ -52,8 +52,12 @@
 
 #+ :build-as-packages (in-package :package-util)
 
-(defconstant +graphviz-shape+ '(:box :oval :ellipse :egg :triangle :diamond :trapezoid :hexgon :octagon))
+(defconstant +graphviz-shape+
+  '(:box :oval :ellipse :egg :triangle :diamond :trapezoid :hexgon :octagon :double-circle :doubleoctagon
+    :tripleoctagon :invtriangle :invtrapezium :house :invhouse :Mdiamond :Msquare :square :star :underline
+    :note :tab :folder :box3d))
 (defconstant +graphviz-packmode+ '(:node :column :cluster))
+(defconstant +graphviz-format+ '(:png :jpeg :jpeg :gif :bmp :svg :svgz :tiff :tif :pdf))
 
 (defparameter *package-dependency-graph-fname-prefix* "package-dependency-graph-")
 (defparameter *package-stack* nil)
@@ -910,31 +914,41 @@
 ;; <package-data> ::= (<package-name> {nil | (<package-nickname-list>)} {nil | (<package-use-list>)}) ;
 ;;
 (defun package-dependency-list ()
-  (let (pkg-nickname-list (result nil) exception-list)
+  (let (pkg-nickname-list (result nil) exception-list pkg-str-use-list)
+
     (set-package-name-case :downcase) ;; パッケージ名文字列を小文字化する。
-    (setf exception-list (union
-			  (union (package-exclusion-list) (packages-exception-list))
-			  (list "common-lisp-user"))
+    (setf exception-list
+	  (union (union (package-exclusion-list) (packages-exception-list)) (list "common-lisp-user"))
 	  )
     (dolist (pkg (list-all-packages))
       (when (not (member (package-name pkg) exception-list :test #'string-equal))
-	;;(format t "pkg=~s~%" pkg)
 	(setf pkg-nickname-list (package-name-case-list-convert (sort-nicknames pkg)))
-	;;(format t "pkg-nickname-list=~s~%" pkg-nickname-list)
-	(if (null pkg-nickname-list)
-	    (push (list (package-name-case-convert (package-name pkg))
-			nil
-			(package-string-use-list pkg)
-			)
-		  result)
-	    (push (list (package-name-case-convert (package-name pkg))
-			pkg-nickname-list
-			(package-string-use-list pkg)
-			)
-		  result)
-	    ) ;; end if
-	) ;; end dolist
-      )	  ;; end when
+	(setf pkg-str-use-list (package-string-use-list pkg))
+
+	(when (debug-print-p "package-dependency-list")
+	  (format t "pkg=~s~%" pkg)
+	  (format t "pkg-nickname-list=~s~%" pkg-nickname-list)
+	  (format t "pkg-str-use-list=~s~%~%" pkg-str-use-list)
+	  )
+
+	(dolist (used-pkg pkg-str-use-list)
+	  ;;(format t "used-pkg=~s~%" used-pkg)
+	  ;;(finish-output)
+	  (push (list
+		 (package-name-case-convert (package-name pkg)) ;; [pkg]のパッケージ名文字列。
+		 pkg-nickname-list ;; [pkg]のニックネーム文字列のリスト。
+		 used-pkg ;; [pkg]がユースしているパッケージ名文字列のリスト。
+		 (if used-pkg ;; [pkg]からユースされているパッケージのニックネーム文字列のリスト。
+		     (package-name-case-list-convert
+		      (sort-nicknames (find-package (string-upcase used-pkg))))
+		     nil)
+		 )
+		result)
+	  ;;(format t "result=~s~%" result)
+	  ;;(finish-output)
+	  ) ;; end inner dolist
+	)   ;; end dolist
+      )	    ;; end when
     ;;(format t "result=~s~%" result)
     (return-from package-dependency-list result)
     ) ;; end let
@@ -965,6 +979,10 @@
 	  )
 	)
 
+    (when (debug-print-p "generate-package-dependency-dot-data")
+      (format t "~s~%" pkg-dep-list)
+      )
+
     (with-open-file (stream fname :direction :output :if-does-not-exist :create :if-exists :supersede)
       (format stream "digraph G {~%")
       (format stream "  pack = true;~%") ;; グラフ全体を密にパック。
@@ -973,18 +991,48 @@
       (dolist (lst pkg-dep-list)
 	;;(format t "lst=~s~%" lst)
 	(cond
-	  ((null (second lst)) ;; ニックネーム文字列のリストが空か？
+	  ((and
+	    (null (second lst)) ;; パッケージのニックネーム文字列のリスト。
+	    (null (fourth lst)) ;; ユースされているパッケージのニックネーム文字列。
+	    )
 	   (format stream "  \"~a\" -> \"~a\";~%"
 		   (third lst) ;; ユースしているパッケージ名文字列のリスト。
 		   (first lst) ;; パッケージ名文字列。
 		   )
 	   )
-	  (t
+	  ((and
+	    (second lst) ;; パッケージのニックネーム文字列のリスト。
+	    (null (fourth lst)) ;; ユースされているパッケージのニックネーム文字列。
+	    )
 	   (format stream "  \"~a\" -> \"~a (~{~a~^,~})\";~%"
 		   (third lst) ;; ユースしているパッケージ名文字列のリスト。
 		   (first lst) ;; パッケージ名文字列。
 		   (second lst) ;; ニックネーム文字列のリスト。
 		   )
+	   )
+	  ((and
+	    (null (second lst)) ;; パッケージのニックネーム文字列のリスト。
+	    (fourth lst) ;; ユースされているパッケージのニックネーム文字列。
+	    )
+	   (format stream "  \"~a (~{~a~^,~})\" -> \"~a\";~%"
+		   (third lst) ;; ユースしているパッケージ名文字列のリスト。
+		   (fourth lst) ;; ユースされているパッケージのニックネーム文字列。
+		   (first lst)	;; パッケージ名文字列。
+		   )
+	   )
+	  ((and
+	    (second lst) ;; パッケージのニックネーム文字列のリスト。
+	    (fourth lst) ;; ユースされているパッケージのニックネーム文字列。
+	    )
+	   (format stream "  \"~a (~{~a~^,~})\" -> \"~a (~{~a~^,~})\";~%"
+		   (third lst) ;; ユースしているパッケージ名文字列のリスト。
+		   (fourth lst) ;; ユースされているパッケージのニックネーム文字列。
+		   (first lst)	;; パッケージ名文字列。
+		   (second lst) ;; ニックネーム文字列のリスト。
+		   )
+	   )
+	  (t
+	   (error "generate-package-dependency-dot-data: can not happen.")
 	   )
 	  ) ;; end cond
 	)   ;; end dolist
@@ -1008,21 +1056,30 @@
     )
   )
 
-(defun viewer-command ()
-  #+(or linux unix) "eog"
-  #+darwin "open -W -a Preview"
-  #+windows "mspaint" ;; または "powershell -command ..." 等
+(defun viewer (format)
+  (if (equal format :pdf)
+      #+(or linux unix) "evince"
+      #+darwin "open -W -a Preview"
+      #+windows "msedge"
+
+      #+(or linux unix) "eog"
+      #+darwin "open -W -a Preview"
+      #+windows "mspaint" ;; または "powershell -command ..." 等
+      )			  ;; end if
   )
 
 ;;
 ;; 除外パッケージ以外のユース情報を作成して描画する。
 ;;
 (defun view-package-dependency-graph
-    (&key (delete-working-files nil) (verbose t) (shape :box) (packmode :node))
-  (let (fname (exist-dot-command-p nil) (exist-viewer-command-p nil) png-file-name dot-file-name)
+    (&key (delete-working-files nil) (verbose t) (shape :box) (packmode :node) (outfile-format :pdf))
+  (let (fname (exist-dot-command-p nil) (exist-viewer-command-p nil) out-file-name dot-file-name out-ext)
 
     (setf exist-dot-command-p (absolute-path "dot" :exec-p t)) ;; dotコマンドが存在して実行可能か？
-    (setf exist-viewer-command-p (absolute-path (viewer-command) :exec-p t)) ;; ビューワ・コマンドは？
+    ;;(when (eql outfile-format :pdf)
+    ;;  (setf viewer "evince")
+    ;;  )
+    (setf exist-viewer-command-p (absolute-path (viewer outfile-format) :exec-p t)) ;; ビューワ・コマンドは？
 
     (when (not (and exist-dot-command-p exist-viewer-command-p))
       (when (not exist-dot-command-p)
@@ -1032,10 +1089,10 @@
 	#+linux (format t "~1,8tsudo apt install graphviz~%")
 	) ;; end inner when
       (when (not exist-viewer-command-p)
-	(warn "Please install ~a.~%" (viewer-command))
+	(warn "Please install ~a.~%" (viewer outfile-format))
 	(format t "Bash~%")
 	#+linux (format t "~1,8tsudo apt update~%")
-	#+linux (format t "~1,8tsudo apt install ~a~%" (viewer-command))
+	#+linux (format t "~1,8tsudo apt install ~a~%" (viewer outfile-format))
 	)
       (return-from view-package-dependency-graph nil)
       )
@@ -1048,13 +1105,20 @@
 			(time-string)
 			)
 	  )
+
+    (when (not (member outfile-format +graphviz-format+ :test #'equal))
+      (error "do not support such format ~a~%" outfile-format)
+      )
+
     (setf dot-file-name (concatenate 'string fname ".dot"))
-    (setf png-file-name (concatenate 'string fname ".png"))
+    ;;(setf out-file-name (concatenate 'string fname ".png"))
+    (setf out-ext (string-downcase (string outfile-format)))
+    (setf out-file-name (concatenate 'string fname "." out-ext))
 
     (when (debug-print-p "view-package-dependency-graph")
       (format t "fname=~s~%" fname)
       (format t "dot-file-name=~s~%" dot-file-name)
-      (format t "png-file-name=~s~%" png-file-name)
+      (format t "out-file-name=~s~%" out-file-name)
       )
 
     (generate-package-dependency-dot-data
@@ -1063,25 +1127,28 @@
      :shape shape
      :packmode packmode)
 
-    (exec-command "dot" "-Tpng" dot-file-name "-o" png-file-name)
+    ;;(exec-command "dot" "-Tpng" dot-file-name "-o" out-file-name)
+    (exec-command "dot" (concatenate 'string "-T" out-ext)
+		  dot-file-name "-o" out-file-name)
     (when verbose
-      (format t "\;\; dot -Tpng ~a -o ~a~%" dot-file-name png-file-name)
-      (format t "\;\; ~a ~a~%" (viewer-command) png-file-name)
+      ;;(format t "\;\; dot -Tpng ~a -o ~a~%" dot-file-name out-file-name)
+      (format t "\;\; dot -T~a ~a -o ~a~%" out-ext dot-file-name out-file-name)
+      (format t "\;\; ~a ~a~%" (viewer outfile-format) out-file-name)
       ) ;; end when
 
     (if delete-working-files
         ;; 削除フラグが t の場合：
         (let ((shell-cmd (format nil "~a ~a 2>/dev/null && rm ~a ~a"
-                                 (viewer-command) png-file-name dot-file-name png-file-name)))
+                                 (viewer outfile-format) out-file-name dot-file-name out-file-name)))
           (exec-command "sh" "-c" (format nil "~a &" shell-cmd)))
         
         ;; 削除フラグが nil の場合：
-        (exec-command "sh" "-c" (format nil "~a ~a 2>/dev/null &" (viewer-command) png-file-name)))
+        (exec-command "sh" "-c" (format nil "~a ~a 2>/dev/null &" (viewer outfile-format) out-file-name)))
 
     ;; if文の外側で verbose フラグをチェックする
     (when (and delete-working-files verbose)
-      (format t "dot file [~a]~% and~%png file [~a]~% will be deleted after closing the viewer.~%" 
-              dot-file-name png-file-name)
+      (format t "dot file [~a]~% and~%viewer file [~a]~% will be deleted after closing the viewer.~%" 
+              dot-file-name out-file-name)
       (finish-output)
       ) ;; end when
     (values)
@@ -1098,12 +1165,14 @@
 ;;	:packmode		Graphvizの描画モードを指定する。
 ;;				  :node :column :cluster
 ;;
-(defun view-pkg-dep (&key (delete-working-files t) (verbose t) (shape :box) (packmode :node))
+(defun view-pkg-dep
+    (&key  (outfile-format :pdf) (delete-working-files t) (verbose t) (shape :box) (packmode :node))
   (view-package-dependency-graph
    :delete-working-files delete-working-files
    :verbose verbose
    :shape shape
    :packmode packmode
+   :outfile-format outfile-format
    )
   )
 
