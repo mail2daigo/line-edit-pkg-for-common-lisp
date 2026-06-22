@@ -58,7 +58,7 @@
     :Msquare :square :star :underline :note :tab :folder :box3d))
 (defconstant +graphviz-packmode+ '(:node :column :cluster))
 (defconstant +graphviz-format+ '(:png :jpeg :jpeg :gif :bmp :svg :svgz :tiff :tif :pdf))
-(defconstant +graphviz-layout+ '(:circo :dot :fdp :neato :osage :sfdp :twopi))
+(defconstant +graphviz-layout+ '(:circo :dot)) ;; 不向きなレイアウトは除いた。
 
 (defparameter *package-dependency-graph-fname-prefix* "package-dependency-graph-")
 (defparameter *package-stack* nil)
@@ -937,16 +937,14 @@
 	  ;;(finish-output)
 	  (push (list
 		 (package-name-case-convert (package-name pkg)) ;; [pkg]のパッケージ名文字列。
-		 pkg-nickname-list ;; [pkg]のニックネーム文字列のリスト。
-		 used-pkg ;; [pkg]がユースしているパッケージ名文字列のリスト。
+		 pkg-nickname-list	;; [pkg]のニックネーム文字列のリスト。
+		 used-pkg		;; [pkg]がユースしているパッケージ名文字列のリスト。
 		 (if used-pkg ;; [pkg]からユースされているパッケージのニックネーム文字列のリスト。
 		     (package-name-case-list-convert
 		      (sort-nicknames (find-package (string-upcase used-pkg))))
 		     nil)
 		 )
 		result)
-	  ;;(format t "result=~s~%" result)
-	  ;;(finish-output)
 	  ) ;; end inner dolist
 	)   ;; end dolist
       )	    ;; end when
@@ -961,7 +959,7 @@
 ;; で表示できる。
 (defun generate-package-dependency-dot-data
     (pkg-dep-list fname &key (shape :box) (packmode :node) (layout :dot))
-  (let (node-shape graph-packmode)
+  (let (node-shape graph-packmode graph-layout)
 
     (if (member shape +graphviz-shape+ :test #'equal)
 	(setf node-shape (string-downcase (string shape)))
@@ -981,6 +979,15 @@
 	  )
 	)
 
+    (if (member layout +graphviz-layout+ :test #'equal)
+	(setf graph-layout (string-downcase (string layout)))
+	(progn
+	  (warn "generate-package-dependency-dot-data: :layout must be ~s." +graphviz-layout+)
+	  (format t "Set layout to \':dot\`.~%")
+	  (setf graph-layout "dot")
+	  )
+	)
+
     (when (debug-print-p "generate-package-dependency-dot-data")
       (format t "~s~%" pkg-dep-list)
       )
@@ -988,7 +995,7 @@
     (with-open-file (stream fname :direction :output :if-does-not-exist :create :if-exists :supersede)
       (format stream "digraph G {~%")
       (format stream "  graph [~%")
-      (format stream "    layout = ~a;~%" (string-downcase (string layout)))
+      (format stream "    layout = ~a;~%" graph-layout)
       (format stream "    pack = true;~%") ;; グラフ全体を密にパック。
       (format stream (format nil "    packmode = ~s;\~\%" graph-packmode))
       (format stream "  ]~%")
