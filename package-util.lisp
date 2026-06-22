@@ -53,11 +53,12 @@
 #+ :build-as-packages (in-package :package-util)
 
 (defconstant +graphviz-shape+
-  '(:box :oval :ellipse :egg :triangle :diamond :trapezoid :hexgon :octagon :double-circle :doubleoctagon
-    :tripleoctagon :invtriangle :invtrapezium :house :invhouse :Mdiamond :Msquare :square :star :underline
-    :note :tab :folder :box3d))
+  '(:box :oval :ellipse :egg :circle :double-circle :triangle :diamond :trapezoid :hexgon :septagon
+    :octagon :doubleoctagon :tripleoctagon :invtriangle :invtrapezium :house :invhouse :Mdiamond
+    :Msquare :square :star :underline :note :tab :folder :box3d))
 (defconstant +graphviz-packmode+ '(:node :column :cluster))
 (defconstant +graphviz-format+ '(:png :jpeg :jpeg :gif :bmp :svg :svgz :tiff :tif :pdf))
+(defconstant +graphviz-layout+ '(:circo :dot :fdp :neato :osage :sfdp :twopi))
 
 (defparameter *package-dependency-graph-fname-prefix* "package-dependency-graph-")
 (defparameter *package-stack* nil)
@@ -958,7 +959,8 @@
 ;;  > dot -Tpng 'fname' -o filename.png
 ;;  > eog filename.png
 ;; で表示できる。
-(defun generate-package-dependency-dot-data (pkg-dep-list fname &key (shape :box) (packmode :node))
+(defun generate-package-dependency-dot-data
+    (pkg-dep-list fname &key (shape :box) (packmode :node) (layout :dot))
   (let (node-shape graph-packmode)
 
     (if (member shape +graphviz-shape+ :test #'equal)
@@ -985,8 +987,11 @@
 
     (with-open-file (stream fname :direction :output :if-does-not-exist :create :if-exists :supersede)
       (format stream "digraph G {~%")
-      (format stream "  pack = true;~%") ;; グラフ全体を密にパック。
-      (format stream (format nil "  packmode = ~s;\~\%" graph-packmode))
+      (format stream "  graph [~%")
+      (format stream "    layout = ~a;~%" (string-downcase (string layout)))
+      (format stream "    pack = true;~%") ;; グラフ全体を密にパック。
+      (format stream (format nil "    packmode = ~s;\~\%" graph-packmode))
+      (format stream "  ]~%")
       (format stream (format nil "  node [shape = ~a];\~\%" node-shape))
       (dolist (lst pkg-dep-list)
 	;;(format t "lst=~s~%" lst)
@@ -1071,8 +1076,8 @@
 ;;
 ;; 除外パッケージ以外のユース情報を作成して描画する。
 ;;
-(defun view-package-dependency-graph
-    (&key (delete-working-files nil) (verbose t) (shape :box) (packmode :node) (outfile-format :pdf))
+(defun view-package-dependency-graph (&key (delete-working-files nil) (verbose t) (shape :box)
+					(packmode :node) (outfile-format :pdf) (layout :dot))
   (let (fname (exist-dot-command-p nil) (exist-viewer-command-p nil) out-file-name dot-file-name out-ext)
 
     (setf exist-dot-command-p (absolute-path "dot" :exec-p t)) ;; dotコマンドが存在して実行可能か？
@@ -1125,7 +1130,9 @@
      (package-dependency-list)
      dot-file-name
      :shape shape
-     :packmode packmode)
+     :packmode packmode
+     :layout layout
+     )
 
     ;;(exec-command "dot" "-Tpng" dot-file-name "-o" out-file-name)
     (exec-command "dot" (concatenate 'string "-T" out-ext)
@@ -1165,14 +1172,15 @@
 ;;	:packmode		Graphvizの描画モードを指定する。
 ;;				  :node :column :cluster
 ;;
-(defun view-pkg-dep
-    (&key  (outfile-format :pdf) (delete-working-files t) (verbose t) (shape :box) (packmode :node))
+(defun view-pkg-dep (&key  (outfile-format :pdf) (delete-working-files t) (verbose t)
+		       (shape :note) (packmode :node) (layout :dot))
   (view-package-dependency-graph
    :delete-working-files delete-working-files
    :verbose verbose
    :shape shape
    :packmode packmode
    :outfile-format outfile-format
+   :layout layout
    )
   )
 
