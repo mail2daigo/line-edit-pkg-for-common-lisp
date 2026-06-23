@@ -45,7 +45,7 @@ endif
 
 # オブジェクト・ファイルの削除
 clean :
-ifeq ($(lisp,sbcl)
+ifeq ($(lisp),sbcl)
 	find $(source-dir) \( -name "*.$(obj)" -o -name "*.lib" \) -type f -delete
 else
 	find $(source-dir) -name "*.$(obj)" -type f -delete
