@@ -954,8 +954,8 @@
   ) ;; end package-dependency-list
 
 ;; パッケージ依存データからGraphviz(DOT)形式のデータを出力する。
-;;  > dot -Tpng 'fname' -o filename.png
-;;  > eog filename.png
+;;  > dot -Tpdf 'fname' -o filename.pdf
+;;  > evince filename.pdf
 ;; で表示できる。
 (defun generate-package-dependency-dot-data
     (pkg-dep-list fname &key (shape :box) (packmode :node) (layout :dot))
@@ -997,9 +997,9 @@
       (format stream "  graph [~%")
       (format stream "    layout = ~a;~%" graph-layout)
       (format stream "    pack = true;~%") ;; グラフ全体を密にパック。
-      (format stream (format nil "    packmode = ~s;\~\%" graph-packmode))
+      (format stream "    packmode = ~s;\~\%" graph-packmode)
       (format stream "  ]~%")
-      (format stream (format nil "  node [shape = ~a];\~\%" node-shape))
+      (format stream "  node [shape = ~a];\~\%" node-shape)
       (dolist (lst pkg-dep-list)
 	;;(format t "lst=~s~%" lst)
 	(cond
@@ -1088,21 +1088,18 @@
   (let (fname (exist-dot-command-p nil) (exist-viewer-command-p nil) out-file-name dot-file-name out-ext)
 
     (setf exist-dot-command-p (absolute-path "dot" :exec-p t)) ;; dotコマンドが存在して実行可能か？
-    ;;(when (eql outfile-format :pdf)
-    ;;  (setf viewer "evince")
-    ;;  )
     (setf exist-viewer-command-p (absolute-path (viewer outfile-format) :exec-p t)) ;; ビューワ・コマンドは？
 
     (when (not (and exist-dot-command-p exist-viewer-command-p))
       (when (not exist-dot-command-p)
 	(warn "Please install Graphviz.~%")
-	(format t "Bash~%")
+	#+linux (format t "Bash~%")
 	#+linux (format t "~1,8tsudo apt update~%")
 	#+linux (format t "~1,8tsudo apt install graphviz~%")
 	) ;; end inner when
       (when (not exist-viewer-command-p)
-	(warn "Please install ~a.~%" (viewer outfile-format))
-	(format t "Bash~%")
+	(warn "Please install ~a viewer.~%" outfile-format)
+	#+linux (format t "Bash~%")
 	#+linux (format t "~1,8tsudo apt update~%")
 	#+linux (format t "~1,8tsudo apt install ~a~%" (viewer outfile-format))
 	)
@@ -1123,7 +1120,6 @@
       )
 
     (setf dot-file-name (concatenate 'string fname ".dot"))
-    ;;(setf out-file-name (concatenate 'string fname ".png"))
     (setf out-ext (string-downcase (string outfile-format)))
     (setf out-file-name (concatenate 'string fname "." out-ext))
 
@@ -1141,11 +1137,9 @@
      :layout layout
      )
 
-    ;;(exec-command "dot" "-Tpng" dot-file-name "-o" out-file-name)
     (exec-command "dot" (concatenate 'string "-T" out-ext)
 		  dot-file-name "-o" out-file-name)
     (when verbose
-      ;;(format t "\;\; dot -Tpng ~a -o ~a~%" dot-file-name out-file-name)
       (format t "\;\; dot -T~a ~a -o ~a~%" out-ext dot-file-name out-file-name)
       (format t "\;\; ~a ~a~%" (viewer outfile-format) out-file-name)
       ) ;; end when
