@@ -37,11 +37,19 @@ all : $(source-dir)/history-repl.$(obj) \
 
 # 削除対象を確認するためのテスト用（削除はしない）
 check-clean :
+ifeq ($(lisp),sbcl)
+	find $(source-dir) \( -name "*.$(obj)" -o -name "*.lib" \) -type f
+else
 	find $(source-dir) -name "*.$(obj)" -type f
+endif
 
-# オブジェクトファイルの削除
+# オブジェクト・ファイルの削除
 clean :
+ifeq ($(lisp,sbcl)
+	find $(source-dir) \( -name "*.$(obj)" -o -name "*.lib" \) -type f -delete
+else
 	find $(source-dir) -name "*.$(obj)" -type f -delete
+endif
 
 $(source-dir)/support-functions.$(obj) : \
 			$(source-dir)/support-functions.lisp
