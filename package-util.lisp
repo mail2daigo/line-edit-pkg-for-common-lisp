@@ -1,7 +1,7 @@
 ;;;
-;;; パッケージ操作用関数を集めたパッケージ。
+;;; last updated : 2026-06-26 11:34:57(JST)
 ;;;
-;;; last updated : 2026-04-11 10:26:00(JST)
+;;; パッケージ操作用関数を集めたパッケージ。
 ;;;
 ;;; 2026-06-20 パッケージ間の依存(ユース)関係をGraphvizで表示する関数[view-package-dependency-graph]を実装。
 ;;;
@@ -1043,9 +1043,9 @@
 		   (second lst) ;; ニックネーム文字列のリスト。
 		   )
 	   )
-	  (t
-	   (error "generate-package-dependency-dot-data: can not happen.")
-	   )
+	  ;;(t
+	  ;; (error "generate-package-dependency-dot-data: can not happen.")
+	  ;; )
 	  ) ;; end cond
 	)   ;; end dolist
       (format stream "}~%")
@@ -1165,18 +1165,18 @@
 
 ;;
 ;; 除外指定以外のパッケージ間のユース関係をGraphvizで描画する関数。
-;;	:delete-working-files	生成されるdotファイルとpngファイルを描画終了後に削除する。
+;;	:rm-tmp			[t]なら生成されるdotファイルと画像ファイルを描画終了後に削除する。
 ;;				ファイル名は実行時の日付と時刻を元に自動的に生成する。
-;;	:verbose		実行するdotコマンドとビューワ・コマンドをコメントとして表示する。
+;;	:verbose		[t]なら実行するdotコマンドとビューワ・コマンドをコメントとして表示する。
 ;;	:shape			Graphvizが描画するノードの形状を指定する。
 ;;				  :box :oval :ellipse :egg :triangle :diamond :trapezoid :hexgon :octagon
 ;;	:packmode		Graphvizの描画モードを指定する。
 ;;				  :node :column :cluster
 ;;
-(defun view-pkg-dep (&key  (outfile-format :pdf) (delete-working-files t) (verbose t)
+(defun view-pkg-dep (&key  (outfile-format :pdf) (rm-tmp t) (verbose t)
 		       (shape :note) (packmode :node) (layout :dot))
   (view-package-dependency-graph
-   :delete-working-files delete-working-files
+   :delete-working-files rm-tmp
    :verbose verbose
    :shape shape
    :packmode packmode

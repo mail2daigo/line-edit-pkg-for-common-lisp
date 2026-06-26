@@ -1,5 +1,5 @@
 ;;;
-;;; last updated : 2026-06-26 14:15:18(JST)
+;;; last updated : 2026-06-20 16:43:37(JST)
 ;;;
 ;;; line-edit-pkg : Read line with customizable editor command, like Emacs, vi and WordMaster.
 ;;;     Licenced under GNU Library General Public Licence.
@@ -26,7 +26,7 @@
 ;;; 入力できる文字数は無制限。文字入力用ウインドウ幅を超えて文字を入力すると自動的に文字が左スクロールする。
 ;;; 特殊文字の文字コード定義は7 bit範囲なので、ASCII、UTF-8、SHIFT-JISで共通。UTF-16、EBCDICは未対応。
 ;;;
-;;; 2026-06-20 [package-util.lisp]にパッケージの依存(ユース)関係をGraphvizで表示する関数[view-pkg-dep]を追加。
+;;; 2026-06-20 [package-util.lisp]にパッケージの依存(ユース)関係をGraphvizで表示する関数[view-dot-graph]を追加。
 ;;; 2026-06-09 [package-util.lisp]内のpushdとpopdのバグを修正。
 ;;; 2026-06-07 [package-util.lisp]に用意されたパッケージ移動関数以外の方法で移動した場合の捕捉方法を修正。
 ;;; 2026-06-06 関数[history-repl]にrepl初期状態のパッケージを指定するオプショナル引数を追加した。
@@ -479,47 +479,7 @@
 (declaim (ftype (function (&optional t t) t) true-getsym))
 (declaim (ftype (function (&optional t t) t) getsym))
 
-;; git addのタイミングでupdate-version.shと.bashrc内のgadd関数でバージョン文字列の日付と時刻を更新している。
-;; ※コンパイル時刻でも最終編集時刻でもない。
-;;
-;; (1) 時刻情報更新用のsedスクリプトを用意する。
-;;	update-version.sh
-;;	---
-;;	#!/bin/sh
-;;	# ファイル内の"Version 2026-06-26 14:21:26"のような文字列を探して日付と時刻情報を更新する。
-;;	sed -E "s/(Version )[0-9: -]+/\1$(date '+%Y-%m-%d %H:%M:%S')/" line-edit-pkg.lisp
-;;	---
-;;
-;; (2) gitにフィルタを設定する。
-;; 	git config filter.line-edit-version.clean  "./update-version.sh"
-;;	git config filter.line-edit-version.smudge "./update-version.sh"
-;;
-;; (3) line-edit-pkg.lisp専用のシェル・コマンド(gadd)を[~/.bashrc]内に定義する。
-;;	---
-;;	# 通常通り git add を実行し、update-version.shで更新したステージング・ファイルをrestoreする。
-;;	# line-edit用の特別版git add
-;;	gadd() {
-;;	# 通常通り git add を実行（ここでcleanフィルターが走りステージングが更新される）
-;;	git add "$@"
-;;
-;;	# 対象ファイルが含まれている場合のみ、手元のファイルを安全に更新する
-;;	for arg in "$@"; do
-;;		if [ "$arg" = "line-edit-pkg.lisp" ]; then
-;;			mv line-edit-pkg.lisp line-edit-pkg.lisp.tmp
-;;			git restore line-edit-pkg.lisp
-;;			rm line-edit-pkg.lisp.tmp
-;;			echo "[gadd] line-edit-pkg.lisp のワーキング・エリアを最新時刻に更新しました。"
-;;		fi
-;;	done
-;;	}
-;;	---
-;;
-;; (4) 実行は
-;;	gadd line-edit-pkg.lisp
-;;
-;; ※ Emacsでline-edit-pkg.lispを開いている場合は一旦クローズして再度読み込み直すこと。
-;;
-(defconstant +line-edit-version+ "line-edit-pkg: Version 2026-06-26 14:21:26")
+(defconstant +line-edit-version+ "line-edit-pkg: Version 2026-06-20 16:41:02")
 
 (defconstant +small-a+                  "small-a")
 (defconstant +small-b+                  "small-b")
@@ -5133,9 +5093,7 @@
   ) ;; end display-line
 
 ;;; C-x <
-;;; 行を左に[n]カラム、スクロールする。[n]はユニバーサル・コマンド(C-u)で設定する。
-;;; C-u C-u C-x < で左に4x4=16文字分スクロール。
-;;; C-u 10 C-x <  で左に10文字分スクロール。
+;;; 行を左に[n]カラム、スクロールする。
 ;;; [左に[n]カラムスクロールする]とは現在のカーソル位置より[n]だけ右側の行を表示すること。
 ;;; そのためカーソル位置を変えずにポインタを[n]だけ増やす。
 ;;; ポイント位置の文字をカーソル位置に表示すれば行が左に[n]カラム、スクロールしたことになる。

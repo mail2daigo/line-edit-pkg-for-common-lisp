@@ -1,5 +1,5 @@
 ;;;
-;;; last updated : 2026-06-21 10:08:33(JST)
+;;; last updated : 2026-06-25 09:47:55(JST)
 ;;;
 
 #+ :build-as-packages
@@ -330,7 +330,7 @@
 
              ;; 入力されたS式の後ろに余分な閉じカッコなどの入力がある。
              (too-many-input-error (c)
-               (if (search ")" (error-garbage c))
+               (if (search ")" (the simple-string (error-garbage c)))
                    (format *error-output* "~&too many parenthesis: \'~a\'~%" (error-garbage c))
                    (format *error-output* "~&too many input: \'~a\'~%" (error-garbage c))
                    ) ;; end if

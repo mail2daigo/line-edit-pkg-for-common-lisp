@@ -1,8 +1,7 @@
-;;; last updated : 2026-06-07 17:48:06(JST)
 ;;;
-;;; history-pkg.lsp: (my first common lisp program. written in and for GCL)
+;;; last updated : 2026-06-25 09:28:41(JST)
 ;;;
-;;; performs 'history', just like csh does.
+;;; history-pkg.lsp: performs 'history', just like csh style.
 ;;;
 ;;
 ;;      for following examples, ">" means top-level prompt.
